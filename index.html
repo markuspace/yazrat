@@ -38,6 +38,7 @@
 		border-color: black;
 		border-style: solid;
 		opacity: 0.8;
+		cursor: pointer;
 	}
 	.square-dungeon {
 		width: 24px;
@@ -703,7 +704,7 @@
 					
 					// individual locations - light world
 					darkcross: {q: '$lamp$'},
-					sewers: {q: '$lamp$'},
+					sewers: {q: '$lamp$ || $glove1$'},
 					bonkrocks: {q: '$boots$'},
 					graveyardledge: {q: '#westdwaccess# && $mirror$'},
 					kingstomb: {q: '$boots$ && ((#westdwaccess# && $mirror$) || $gloves2$)'},
@@ -732,7 +733,8 @@
 					floatingisland: {q: '#dwdmaccess# && $mirror$'},
 					spiralcave: {q: '#lweastdmaccess#'},
 					mimiccave: {q: '#traccess# && $mirror$'}, // fire rod may not be required
-					
+					paradoxcave: {q: '#lweastdmaccess#'},
+
 					// individual locations - dark world
 					pyramidledge: {q: '#eastdwaccess# || $agahnim$'},
 					pyramidfairy: {q: '#eastdwaccess#'}, // TODO crystal logic
@@ -782,10 +784,22 @@
 					left: e.x * r - (e.type == 'dungeon' ? 13 : 8),
 					top: e.y * r - (e.type == 'dungeon' ? 13 : 8)
 				});
+				el.attr('title', e.p);
 				if(e.type == 'dungeon') {
 					el.addClass('square-dungeon');
 					el.html(e.count);
 				}
+				
+				el.click(function(ev) {
+					var e2 = $(ev.currentTarget);
+					if(e2.hasClass('s-done')) {
+						e2.removeClass('s-done');
+						applyAllLogic();
+					} else {
+						e2.removeClass('s-no s-yes s-see').addClass('s-done');
+					}
+				});
+				
 				if(e.map == 'lightworld') {
 					el.appendTo(lw);
 				}
@@ -811,17 +825,16 @@
 				//console.log('Applying logic');
 				var lgc = lg[mode];
 				$.each(pd, function(i, e) {
-					var l = lgc[i];
-					if(l) {
-						//console.log('evaluating ' + l.q);
+					if(!e.el.hasClass('s-done')) {
+						var l = lgc[i];
 						var status = 's-no';
-						if(l.q == '')
+						if(!l || l.q == '' || evalLogic(l.q, inv, lgc)) {
 							status = 's-yes';
-						else if (evalLogic(l.q, inv, lgc))
-							status = 's-yes';
-						else if(l.qSee !== undefined && (l.qSee == '' || evalLogic(l.qSee, inv, lgc)))
+						}
+						else if(l && l.qSee !== undefined && (l.qSee == '' || evalLogic(l.qSee, inv, lgc))) {
 							status = 's-see';
-						e.el.removeClass("s-no s-yes s-see s-done").addClass(status);
+						}
+						e.el.removeClass("s-no s-yes s-see").addClass(status);
 					}
 				});
 			}
