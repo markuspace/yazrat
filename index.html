@@ -1,0 +1,945 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Yet Another LTTPR Tracker</title>
+	<style>
+	.inventory {
+		background-color: black;
+	}
+	.inv-item {
+		display: inline-block;
+		width: 56px;
+		height: 56px;
+	}
+	.inv-empty {
+		opacity: 0.3;
+	}
+	.inv-filled {
+	}
+	.mapcontainer {
+		position:relative;
+	}
+	.lightworld {
+		position:relative;
+	}
+	.darkworld {
+		position:relative;
+	}
+	.worldmap {
+	  width: 432px;
+	  height: 432px;
+	}
+	.square {
+		position: absolute;
+		width: 14px;
+		height: 14px;
+		border-width: 2px;
+		border-color: black;
+		border-style: solid;
+		opacity: 0.8;
+	}
+	.square-dungeon {
+		width: 24px;
+		height: 24px;
+		font-weight: bold;
+		color: black;
+		display: inline-flex;
+		justify-content: center;
+		align-items: center;
+	}
+	.square:hover {
+		border-color: yellow
+	}
+	.s-no {
+		background-color: red
+	}
+	.s-see {
+		background-color: yellow
+	}
+	.s-yes {
+		background-color: lime
+	}
+	.s-done {
+		background-color: gray;
+	}
+	</style>
+</head>
+<body>
+    <script src="jquery-3.5.1.js"></script>
+    <script>
+		// evaluate logic and determine if location is accessible based on inventory
+		function evalLogic(str, inventory, logic) {
+			//console.log("String: " +str);
+			// parse string, replacing $variables$ with true/false then evaluating as literal
+			var parsed = '';
+			var myvar = '';
+			var parsing = false;
+			for(var i = 0; i < str.length; i++) {
+				// $ is normal inventory variable, # is complex expression
+				if(str[i] == '$' || str[i] == '#') {
+					if(parsing) { 
+						// evaluate
+						parsing = false;
+						if(str[i] == '#') {
+							// todo update for mode
+							var lgstr = logic[myvar].q;
+							var rv = evalLogic(lgstr, inventory, logic);
+							parsed = parsed + rv;
+						}
+						else {
+							// check if it's a countable inventory item
+							if(!isNaN(str[i-1])) {
+								myvar = myvar.substring(0, myvar.length-1);
+							}
+							var item = inventory[myvar];
+							if(item !== undefined && item.active()) {
+								if(item.countable()) {
+									if(item.current >= str[i-1])
+										parsed = parsed + 'true';
+									else
+										parsed = parsed + 'false';
+									//console.log('Parsed ' + myvar + ' as ' + parsed);
+								}
+								else
+									parsed = parsed + 'true';
+							}
+							else {
+								parsed = parsed + 'false';
+							}
+						}
+					}
+					else {
+						parsing = true;
+						myvar = '';
+					}
+				} else {
+					if(parsing) {
+						myvar = myvar + str[i];
+					}
+					else {
+						parsed = parsed + str[i];
+					}
+				}
+				//console.log(i + ": " + str[i]);
+			}
+			return eval(parsed);
+		}
+	
+		$( document ).ready(function() {
+		
+			// place data except logic. Based on 2048x2048 maps for light & dark world
+			var pd = {
+				// light world locations
+				linkshouse:
+				{
+					p: "Link's House",
+					map: "lightworld",
+					x: 1119,
+					y: 1388
+				},
+				secretpassage:
+				{
+					p: "Secret Passage",
+					map: "lightworld",
+					x: 1219,
+					y: 841
+				},
+				escape:
+				{
+					p: "Escape",
+					map: "lightworld",
+					x: 1023,
+					y: 877
+				},
+				darkcross:
+				{
+					p: "Dark Cross",
+					map: "lightworld",
+					x: 1125,
+					y: 760
+				},
+				sewers:
+				{
+					p: "Sewers",
+					map: "lightworld",
+					x: 1064,
+					y: 600
+				},
+				sanctuary:
+				{
+					p: "Sanctuary",
+					map: "lightworld",
+					x: 943,
+					y: 531
+				},
+				bonkrocks:
+				{
+					p: "Bonk Rocks",
+					map: "lightworld",
+					x: 800,
+					y: 579
+				},
+				graveyardledge:
+				{
+					p: "Graveyard Ledge",
+					map: "lightworld",
+					x: 1162,
+					y: 540
+				},
+				kingstomb:
+				{
+					p: "King's Tomb",
+					map: "lightworld",
+					x: 1235,
+					y: 592
+				},
+				lumberjack: {
+					p: "Lumberjack",
+					map: "lightworld",
+					x: 677,
+					y: 64
+				},
+				lostwoodshidehout: {
+					p: "Lost Woods Hidehout",
+					map: "lightworld",
+					x: 385,
+					y: 268
+				},
+				mushroom: {
+					p: "Mushroom",
+					map: "lightworld",
+					x: 246,
+					y: 173
+				},
+				pedestal: {
+					p: "Pedestal",
+					map: "lightworld",
+					x: 83,
+					y: 85
+				},
+				blindshut: {
+					p: "Blind's Hut",
+					map: "lightworld",
+					x: 264,
+					y: 840
+				},
+				kakarikowell: {
+					p: "Kakariko Well",
+					map: "lightworld",
+					x: 58,
+					y: 857
+				},
+				bottlevendor:
+				{
+					p: "Bottle Vendor",
+					map: "lightworld",
+					x: 194,
+					y: 948
+				},
+				chickenhouse: {
+					p: "Chicken House",
+					map: "lightworld",
+					x: 200,
+					y: 1082
+				},
+				tavern: {
+					p: "Kakariko Tavern",
+					map: "lightworld",
+					x: 328,
+					y: 1166
+				},
+				sickkid:
+				{
+					p: "Sick Kid",
+					map: "lightworld",
+					x: 319,
+					y: 1078
+				},
+				blacksmith:
+				{
+					p: "Blacksmith",
+					map: "lightworld",
+					x: 625,
+					y: 1070
+				},
+				magicbat:
+				{
+					p: "Magic Bat",
+					map: "lightworld",
+					x: 664,
+					y: 1147
+				},
+				library:
+				{
+					p: "Library",
+					map: "lightworld",
+					x: 320,
+					y: 1324
+				},
+				mazerace:
+				{
+					p: "Maze Race",
+					map: "lightworld",
+					x: 65,
+					y: 1425
+				},
+				digspot:
+				{
+					p: "Dig Spot",
+					map: "lightworld",
+					x: 586,
+					y: 1347
+				},
+				cave45:
+				{
+					p: "Cave 45",
+					map: "lightworld",
+					x: 543,
+					y: 1665
+				},
+				bombostablet:
+				{
+					p: "Bombos Tablet",
+					map: "lightworld",
+					x: 458,
+					y: 1885
+				},
+				checkerboardcave:
+				{
+					p: "Checkerboard Cave",
+					map: "lightworld",
+					x: 372,
+					y: 1589
+				},
+				desertledge:
+				{
+					p: "Checkerboard Cave",
+					map: "lightworld",
+					x: 47,
+					y: 1864
+				},
+				aginahscave:
+				{
+					p: "Aginah's Cave",
+					map: "lightworld",
+					x: 406,
+					y: 1666
+				},
+				dam:
+				{
+					p: "Dam",
+					map: "lightworld",
+					x: 959,
+					y: 1910
+				},
+				minimoldormcave:
+				{
+					p: "Mini Moldorm Cave",
+					map: "lightworld",
+					x: 1335,
+					y: 1916
+				},
+				icerodcave:
+				{
+					p: "Ice Rod Cave",
+					map: "lightworld",
+					x: 1832,
+					y: 1560
+				},
+				hyliaisland:
+				{
+					p: "Hylia Island",
+					map: "lightworld",
+					x: 1487,
+					y: 1697
+				},
+				hobo:
+				{
+					p: "Hobo",
+					map: "lightworld",
+					x: 1448,
+					y: 1422
+				},
+				sahasrahla:
+				{
+					p: "Sahasrahla",
+					map: "lightworld",
+					x: 1660,
+					y: 960
+				},
+				sahasrahlashut:
+				{
+					p: "Sahasrahla's Hut",
+					map: "lightworld",
+					x: 1660,
+					y: 880
+				},
+				witchshut:
+				{
+					p: "Witch's Hut",
+					map: "lightworld",
+					x: 1652,
+					y: 675
+				},
+				waterfallfairy:
+				{
+					p: "Waterfall Fairy",
+					map: "lightworld",
+					x: 1844,
+					y: 274
+				},
+				zoraledge:
+				{
+					p: "Zora Ledge",
+					map: "lightworld",
+					x: 1971,
+					y: 315
+				},
+				zora:
+				{
+					p: "Zora",
+					map: "lightworld",
+					x: 1971,
+					y: 230
+				},
+				oldman:
+				{
+					p: "Old Man",
+					map: "lightworld",
+					x: 807,
+					y: 280
+				},
+				spectaclerock:
+				{
+					p: "Spectacle Rock",
+					map: "lightworld",
+					x: 1034,
+					y: 168
+				},
+				spectaclerockcave:
+				{
+					p: "Spectacle Rock Cave",
+					map: "lightworld",
+					x: 1012,
+					y: 283
+				},
+				ethertablet:
+				{
+					p: "Ether Tablet",
+					map: "lightworld",
+					x: 863,
+					y: 33
+				},
+				floatingisland:
+				{
+					p: "Floating Island",
+					map: "lightworld",
+					x: 1662,
+					y: 43
+				},
+				spiralcave:
+				{
+					p: "Spiral Cave",
+					map: "lightworld",
+					x: 1630,
+					y: 183
+				},
+				mimiccave:
+				{
+					p: "Mimic Cave",
+					map: "lightworld",
+					x: 1725,
+					y: 183
+				},
+				paradoxcave:
+				{
+					p: "Paradox Cave",
+					map: "lightworld",
+					x: 1768,
+					y: 438
+				},
+				
+				// dark world locations
+				pyramidledge:
+				{
+					p: "Pyramid Ledge",
+					map: "darkworld",
+					x: 1189,
+					y: 913
+				},
+				pyramidfairy:
+				{
+					p: "Pyramid Fairy",
+					map: "darkworld",
+					x: 959,
+					y: 985
+				},
+				catfish:
+				{
+					p: "Catfish",
+					map: "darkworld",
+					x: 1850,
+					y: 349
+				},
+				hypecave:
+				{
+					p: "Hype Cave",
+					map: "darkworld",
+					x: 1221,
+					y: 1585
+				},
+				bumpercave:
+				{
+					p: "Bumper Cave",
+					map: "darkworld",
+					x: 701,
+					y: 313
+				},
+				chestgame:
+				{
+					p: "Chest Game",
+					map: "darkworld",
+					x: 104,
+					y: 937
+				},
+				bombhut:
+				{
+					p: "Bomb Hut",
+					map: "darkworld",
+					x: 225,
+					y: 1177
+				},
+				cshapedhouse:
+				{
+					p: "C Shaped House",
+					map: "darkworld",
+					x: 425,
+					y: 967
+				},
+				purplechest:
+				{
+					p: "Purple Chest",
+					map: "darkworld",
+					x: 625,
+					y: 1073
+				},
+				hammerpegs:
+				{
+					p: "Hammer Pegs",
+					map: "darkworld",
+					x: 647,
+					y: 1231
+				},
+				diggame:
+				{
+					p: "Dig Game",
+					map: "darkworld",
+					x: 117,
+					y: 1390
+				},
+				stumpy:
+				{
+					p: "Stumpy",
+					map: "darkworld",
+					x: 633,
+					y: 1393
+				},
+				mireshed:
+				{
+					p: "Mire Shed",
+					map: "darkworld",
+					x: 45,
+					y: 1623
+				},
+				superbunnycave:
+				{
+					p: "Superbunny Cave",
+					map: "darkworld",
+					x: 1726,
+					y: 297
+				},
+				hookshotcave:
+				{
+					p: "Hookshot Cave",
+					map: "darkworld",
+					x: 1702,
+					y: 60
+				},
+				hookshotcavebonkchest:
+				{
+					p: "Hookshot Cave Bonk Chest",
+					map: "darkworld",
+					x: 1702,
+					y: 140
+				},
+				spikecave:
+				{
+					p: "Spike Cave",
+					map: "darkworld",
+					x: 1175,
+					y: 279
+				},
+				
+				// dungeons
+				castletower:
+				{
+					p: "Castle Tower",
+					type: 'dungeon',
+					map: "lightworld",
+					count: 0,
+					x: 922,
+					y: 814
+				},
+				easternpalace:
+				{
+					p: "Eastern Palace",
+					type: 'dungeon',
+					map: "lightworld",
+					count: 3,
+					x: 1963,
+					y: 810
+				},
+				desertpalace:
+				{
+					p: "Desert Palace",
+					type: 'dungeon',
+					map: "lightworld",
+					count: 2,
+					x: 150,
+					y: 1611
+				},
+				towerofhera:
+				{
+					p: "Tower of Hera",
+					type: 'dungeon',
+					map: "lightworld",
+					count: 2,
+					x: 1147,
+					y: 62
+				},
+				palaceofdarkness:
+				{
+					p: "Palace of Darkness",
+					type: 'dungeon',
+					map: "darkworld",
+					count: 5,
+					x: 1963,
+					y: 810
+				},
+				swamppalace:
+				{
+					p: "Swamp Palace",
+					type: 'dungeon',
+					map: "darkworld",
+					count: 6,
+					x: 961,
+					y: 1904
+				},
+				skullwoods:
+				{
+					p: "Skull Woods",
+					type: 'dungeon',
+					map: "darkworld",
+					count: 2,
+					x: 79,
+					y: 97
+				},
+				thievestown:
+				{
+					p: "Thieves' Town",
+					type: 'dungeon',
+					map: "darkworld",
+					count: 4,
+					x: 257,
+					y: 979
+				},
+				icepalace:
+				{
+					p: "Ice Palace",
+					type: 'dungeon',
+					map: "darkworld",
+					count: 3,
+					x: 1632,
+					y: 1748
+				},
+				miserymire: 
+				{
+					p: "Misery Mire",
+					type: 'dungeon',
+					map: "darkworld",
+					count: 2,
+					x: 152,
+					y: 1631
+				},
+				turtlerock:
+				{
+					p: "Turtle Rock",
+					type: 'dungeon',
+					map: "darkworld",
+					count: 5,
+					x: 1927,
+					y: 130
+				},
+
+			};
+			
+			// logic
+			var lg = {
+				open:
+				{
+					// medallion logic
+					miremedallion: {q: '($bombos$ && $ether$ && $quake$) || ($bombos$ && $mirebombos$) || ($ether$ && $mireether$) || ($quake$ && $mirequake$)'},
+					trmedallion: {q: '($bombos$ && $ether$ && $quake$) || ($bombos$ && $trbombos$) || ($ether$ && $trether$) || ($quake$ && $trquake$)'},
+				
+					// regions
+					lwwestdmaccess: {q: '($lamp$ && $gloves1$) || $flute$' },
+					lweastdmaccess: {q: '#lwwestdmaccess# && ($hookshot$ || ($mirror$ && $hammer$))'},
+					dwdmaccess: {q: '#lweastdmaccess# && $gloves2$ && $moonpearl$'},
+					westdwaccess: {q: '$moonpearl$ && (($agahnim$ && ($hookshot$ || $hammer$)) || ($hammer$ && $gloves1$) || $gloves2$)'},
+					eastdwaccess: {q: '$moonpearl$ && ($agahnim$ || ($hammer$ && $gloves1$) || ($gloves2$ && $flippers$))'},
+					mireaccess: {q: '$moonpearl$ && $flute$ && $gloves2$'},
+					traccess: {q: '#lweastdmaccess# && #trmedallion# && $gloves2$ && $moonpearl$ && $hammer$ && $somaria$'}, // TODO medallion logic
+					
+					// individual locations - light world
+					darkcross: {q: '$lamp$'},
+					sewers: {q: '$lamp$'},
+					bonkrocks: {q: '$boots$'},
+					graveyardledge: {q: '#westdwaccess# && $mirror$'},
+					kingstomb: {q: '$boots$ && ((#westdwaccess# && $mirror$) || $gloves2$)'},
+					lumberjack: {q: '$agahnim$ && $boots$', qSee: ''},
+					pedestal: {q: ''}, // TODO pendant logic
+					sickkid: {q: '$bottle$'},
+					blacksmith: {q: '#westdwaccess# && $gloves2$'},
+					magicbat: {q: '$hammer$ && $powder$'},
+					library: {q: '$boots$', qSee:''},
+					digspot: {q: '$shovel$'},
+					cave45: {q: '#westdwaccess# && $mirror$'},
+					bombostablet: {q: '#westdwaccess# && $mirror$ && $book$ && $sword2$', qSee: '#westdwaccess# && $mirror$ && $book$'},
+					checkerboardcave: {q: '#mireaccess# && $mirror$'},
+					desertledge: {q: '$book$ || (#mireaccess# && $mirror$)', qSee: ''},
+					hyliaisland: {q: '(#westdwaccess# || #eastdwaccess#) && $mirror$', qSee: ''},
+					hobo: {q: '$flippers$'},
+					sahasrahla: {q: ''}, // TODO pendant logic
+					witchshut: {q: '$mushroom$'},
+					waterfallfairy: {q: '$flippers$'},
+					zoraledge: {q: '$flippers$', qSee: '$gloves1$'},
+					zora: {q: '$flippers$ || $gloves1$'},
+					oldman: {q: '#lwwestdmaccess# && $lamp$'},
+					spectaclerock: {q: '#lwwestdmaccess# && $mirror$', qSee: '#lwwestdmaccess#'},
+					spectaclerockcave: {q: '#lwwestdmaccess#'},
+					ethertablet: {q: '#lwwestdmaccess# && ($mirror$ || ($hookshot$ && $hammer$)) && $book$ && $sword2$', qSee: '#lwwestdmaccess# && ($mirror$ || ($hookshot$ && $hammer$)) && $book$'},
+					floatingisland: {q: '#dwdmaccess# && $mirror$'},
+					spiralcave: {q: '#lweastdmaccess#'},
+					mimiccave: {q: '#traccess# && $mirror$'}, // fire rod may not be required
+					
+					// individual locations - dark world
+					pyramidledge: {q: '#eastdwaccess# || $agahnim$'},
+					pyramidfairy: {q: '#eastdwaccess#'}, // TODO crystal logic
+					catfish: {q: '#eastdwaccess# && $gloves1$'}, 
+					hypecave: {q: '#westdwaccess#'},
+					bumpercave: {q: '#westdwaccess# && $cape$', qSee:'#westdwaccess#'},
+					chestgame: {q: '#westdwaccess#'},
+					bombhut: {q: '#westdwaccess#'},
+					cshapedhouse: {q: '#westdwaccess#'},
+					purplechest: {q: '#westdwaccess# && $gloves2$'},
+					hammerpegs: {q: '#westdwaccess# && $gloves2$ && $hammer$'},
+					diggame: {q: '#westdwaccess#'},
+					stumpy: {q: '#westdwaccess#'},
+					mireshed: {q: '#mireaccess#'},
+					superbunnycave: {q: '#dwdmaccess#'},
+					hookshotcave: {q: '#dwdmaccess# && $hookshot$'},
+					hookshotcavebonkchest: {q: '#dwdmaccess# && ($hookshot$ || $boots$)'},
+					spikecave: {q: '#lwwestdmaccess# && $moonpearl$ && $hammer$'}, // TODO cape/byrna logic, need to look it up
+
+					// TODO - logic for # of chests available per dungeon
+					castletower: {q: '$sword2$ || $cape$ || $byrna$'},
+					easternpalace: {q: '$lamp$ && $bow1$', qSee: ''},
+					desertpalace: {q: '($firerod$ || $lamp$) && ($book$ || (#mireaccess# && $mirror$))', qSee: '$book$ || (#mireaccess# && $mirror$)'},
+					towerofhera: {q: '($firerod$ || $lamp$) && #lwwestdmaccess# && ($mirror$ || ($hookshot$ && $hammer$))', qSee: '#lwwestdmaccess# && ($mirror$ || ($hookshot$ && $hammer$))'},
+					palaceofdarkness: {q: '#eastdwaccess# && $bow1$ && $hammer$ && ($lamp$ || $firerod$)', qSee: '#eastdwaccess#'},
+					swamppalace: {q: '#westdwaccess# && $flippers$ && $mirror$ && $hookshot$ && $hammer$', qSee: '#westdwaccess# && $flippers$ && $mirror$'},
+					skullwoods: {q: '#westdwaccess# && $firerod$', qSee: '#westdwaccess#'},
+					thievestown: {q: '#westdwaccess# && $hammer$', qSee: '#westdwaccess#'},
+					icepalace: {q: '$flippers$ && $moonpearl$ && $gloves2$ && ($bombos$ || $firerod$) && ($somaria$ || $hookshot$)', qSee: '$flippers$ && $moonpearl$ && $gloves2$ && ($bombos$ || $firerod$)'}, // may be hookshot locked if not using icebreaker
+					miserymire: {q: '#mireaccess# && #miremedallion# && ($boots$ || $hookshot$) && $somaria$ && $lamp$', qSee: '#mireaccess# && #miremedallion# && ($boots$ || $hookshot$)'}, // TODO medallion logic
+					turtlerock: {q: '#traccess# && $firerod$ && $icerod$', qSee: '#traccess#'},
+				}
+			};
+						
+			
+			var lw = $('#lw');
+			var dw = $('#dw');
+			// original images are 2048x2048
+			var r = 432/2048;
+			var w = 8; // square + border widths / 2
+			// set up initial view, add locations to maps
+			
+			$.each(pd, function(i, e) {
+				var el = $('<div class="square s-yes"></div>').css({
+					// update coordinates based on map dimensions & marker box size
+					// TODO make this more dynamically configurable
+					left: e.x * r - (e.type == 'dungeon' ? 13 : 8),
+					top: e.y * r - (e.type == 'dungeon' ? 13 : 8)
+				});
+				if(e.type == 'dungeon') {
+					el.addClass('square-dungeon');
+					el.html(e.count);
+				}
+				if(e.map == 'lightworld') {
+					el.appendTo(lw);
+				}
+				else if(e.map == 'darkworld') {
+					el.appendTo(dw);
+				}
+				e.el = el;
+			});
+			
+			/*
+			var dw = $('#dw');
+			$('<div class="square s-done"></div>').css({
+				top: pLw[0].x-8,
+				left: pLw[0].y-8
+			}).appendTo(dw);
+			*/
+			
+			//var inv = ['sword1', 'hookshot', 'bombos', 'bottle', 'lamp'];
+			var mode = 'open';
+			
+			// apply logic
+			function applyAllLogic() {
+				//console.log('Applying logic');
+				var lgc = lg[mode];
+				$.each(pd, function(i, e) {
+					var l = lgc[i];
+					if(l) {
+						//console.log('evaluating ' + l.q);
+						var status = 's-no';
+						if(l.q == '')
+							status = 's-yes';
+						else if (evalLogic(l.q, inv, lgc))
+							status = 's-yes';
+						else if(l.qSee !== undefined && (l.qSee == '' || evalLogic(l.qSee, inv, lgc)))
+							status = 's-see';
+						e.el.removeClass("s-no s-yes s-see s-done").addClass(status);
+					}
+				});
+			}
+			//pd['lwlinkshouse'].el.removeClass("s-no s-yes s-see s-done").addClass("s-yes");
+			
+			// create inventory objects & add behaviour
+			var inv = {};
+			
+			// create inventory html & set up behaviour
+			var invElements = $("#inventory").find('.inv-item');
+			$.each(invElements, function(i, e3) {
+				var e = $(e3);
+				inv[e.data('item')] = {
+					element: e,
+					count: e.data('count') != undefined ? e.data('count') : 1,
+					current: 0,
+					item: e.data('item'),
+					
+					update: function() {
+						this.element.empty();
+							var asset = "assets/" + this.item;
+						if(this.count > 1) {
+							if(this.current == 0)
+								asset = asset + "1"
+							else
+								asset = asset + this.current;
+						}
+						asset = asset + ".png";
+						var el = $('<img src="' + asset + '" style="width: 100%; height: 100%" ></img>');
+						el.appendTo(this.element);
+						
+						if(this.current == 0) {
+							this.element.addClass('inv-empty');
+						}
+						else {
+							this.element.removeClass('inv-empty');
+						}
+					},
+					
+					cycle: function() {
+						if(this.current == this.count) this.current = 0;
+						else this.current = this.current + 1;
+						this.update();
+					},
+					
+					active: function() {
+						return this.current > 0;
+					},
+					
+					countable: function() {
+						return this.count > 1;
+					}
+				}
+			
+				$(e).click(function(ev) {
+					var e2 = ev.currentTarget;
+					var item = inv[$(e2).data('item')];
+					item.cycle();
+					applyAllLogic();
+				});
+				
+				inv[e.data('item')].update();
+			});
+
+			applyAllLogic();
+		});
+    </script>
+	<div id="inventory" class="inventory">
+		<div>
+			<span class='inv-item inv-empty' data-item='sword' data-count='4'></span>
+			<span class='inv-item inv-empty' data-item='boots'></span>
+			<span style="width: 12px; display:inline-block;"></span>
+			<span class='inv-item inv-empty' data-item='bow' data-count='2'></span>
+			<span class='inv-item inv-empty' data-item='hookshot'></span>
+			<span class='inv-item inv-empty' data-item='bomb'></span>
+			<span class='inv-item inv-empty' data-item='mushroom'></span>
+			<span class='inv-item inv-empty' data-item='powder'></span>
+			<span style="width: 12px; display:inline-block;"></span>
+			<span class='inv-item inv-empty' data-item='agahnim'></span>
+		</div>
+		<div>
+			<span class='inv-item inv-empty' data-item='armor' data-count='3'></span>
+			<span class='inv-item inv-empty' data-item='gloves' data-count='2'></span>
+			<span style="width: 12px; display:inline-block;"></span>
+			<span class='inv-item inv-empty' data-item='firerod'></span>
+			<span class='inv-item inv-empty' data-item='icerod'></span>
+			<span class='inv-item inv-empty' data-item='bombos'></span>
+			<span class='inv-item inv-empty' data-item='ether'></span>
+			<span class='inv-item inv-empty' data-item='quake'></span>
+		</div>
+		<div>
+			<span class='inv-item inv-empty' data-item='shield' data-count='3'></span>
+			<span class='inv-item inv-empty' data-item='flippers'></span>
+			<span style="width: 12px; display:inline-block;"></span>
+			<span class='inv-item inv-empty' data-item='lamp'></span>
+			<span class='inv-item inv-empty' data-item='hammer'></span>
+			<span class='inv-item inv-empty' data-item='flute'></span>
+			<span class='inv-item inv-empty' data-item='shovel'></span>
+			<span class='inv-item inv-empty' data-item='book'></span>
+		</div>
+		<div>
+			<span style="width: 56px; display:inline-block;"></span>
+			<span class='inv-item inv-empty' data-item='moonpearl'></span>
+			<span style="width: 12px; display:inline-block;"></span>
+			<span class='inv-item inv-empty' data-item='bottle'></span>
+			<span class='inv-item inv-empty' data-item='somaria'></span>
+			<span class='inv-item inv-empty' data-item='byrna'></span>
+			<span class='inv-item inv-empty' data-item='cape'></span>
+			<span class='inv-item inv-empty' data-item='mirror'></span>
+		</div>
+	</div>
+	<div class="mapcontainer" id="mc">
+		<div id="lw" class="lightworld">
+			<img src="lightworld_large.gif" class="worldmap"/>
+		</div>
+		<div id="dw" class="darkworld">
+			<img src="darkworld_large.gif" class="worldmap"/>
+		</div>
+	</div>
+</body>
+</html>
